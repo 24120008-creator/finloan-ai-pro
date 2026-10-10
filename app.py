@@ -55,18 +55,25 @@ def calc(principal, annual_rate, months):
 def ai_answer(question, context, history):
     if OpenAI is None:
         return "Chưa cài OpenAI SDK. Hãy chạy `pip install -r requirements.txt`."
-    key = secret("OPENAI_API_KEY")
+    
+    key = secret("OPENROUTER_API_KEY")
     if not key:
         return ("🔐 Chatbot chưa có API key. Vào **Streamlit → Settings → Secrets** "
-                "và thêm `OPENAI_API_KEY`.")
-    model = secret("OPENAI_MODEL", "gpt-5")
-    client = OpenAI(api_key=key)
-
-    recent = "\n".join(
-        f"{'User' if x['role']=='user' else 'AI'}: {x['content']}"
-        for x in history[-10:]
+                "và thêm `OPENROUTER_API_KEY`.")
+    
+    # Model mặc định trên OpenRouter (ví dụ: gpt-4o-mini hoặc claude-3.5-sonnet)
+    model = secret("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    
+    # Khởi tạo OpenAI client trỏ tới OpenRouter
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=key,
     )
-    instructions = f"""
+
+    messages = [
+        {
+            "role": "system",
+            "content": f"""
 Bạn là FinLoan AI PRO, trợ lý thông minh bằng tiếng Việt.
 Bạn có thể trả lời câu hỏi về khoản vay, ngân hàng, tài chính cá nhân,
 tiết kiệm, lập ngân sách, công nghệ, học tập, công việc và các câu hỏi
@@ -81,19 +88,29 @@ Quy tắc:
 
 DỮ LIỆU KHOẢN VAY:
 {context}
-
-LỊCH SỬ:
-{recent}
 """
+        }
+    ]
+
+    # Đưa lịch sử chat vào message
+    for x in history[-10:]:
+        role = "user" if x["role"] == "user" else "assistant"
+        messages.append({"role": role, "content": x["content"]})
+
+    messages.append({"role": "user", "content": question})
+
     try:
-        res = client.responses.create(
+        res = client.chat.completions.create(
             model=model,
-            instructions=instructions,
-            input=question
+            messages=messages,
+            extra_headers={
+                "HTTP-Referer": "https://streamlit.io", # Tùy chọn cho OpenRouter rankings
+                "X-Title": "FinLoan AI PRO"
+            }
         )
-        return res.output_text
+        return res.choices[0].message.content
     except Exception as e:
-        return f"⚠️ Không gọi được AI: `{type(e).__name__}`."
+        return f"⚠️ Không gọi được AI: `{type(e).__name__}: {e}`."
 
 # ---------- Local cover ----------
 cover = os.path.join(os.path.dirname(__file__), "assets", "bank_cover.svg")
@@ -149,8 +166,8 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     st.divider()
-    st.markdown("### 🤖 AI")
-    st.success("Đã có API key" if secret("OPENAI_API_KEY") else "Chưa có API key")
+    st.markdown("### 🤖 AI (OpenRouter)")
+    st.success("Đã có API key" if secret("OPENROUTER_API_KEY") else "Chưa có API key")
     if st.button("🗑️ Xóa hội thoại", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -316,29 +333,3 @@ else:
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
-```
-
-### 2. Bật AI
-Tạo `.streamlit/secrets.toml`:
-```toml
-OPENAI_API_KEY = "YOUR_API_KEY"
-OPENAI_MODEL = "gpt-5"
-```
-
-### 3. Deploy GitHub
-Upload toàn bộ project lên GitHub → Streamlit Community Cloud → chọn repository → `app.py`.
-
-### 4. Secret trên Streamlit Cloud
-Vào **Advanced settings → Secrets** và dán:
-```toml
-OPENAI_API_KEY = "YOUR_API_KEY"
-OPENAI_MODEL = "gpt-5"
-```
-
-### 5. Lưu ý
-Kết quả là mô phỏng. Lãi suất, phí, bảo hiểm và cách tính thực tế của ngân hàng có thể khác.
-""")
-
-st.markdown('<div class="chat-float">🤖 FinLoan AI</div>',unsafe_allow_html=True)
-st.caption(f"FinLoan AI PRO • {datetime.now().year} • Công cụ tham khảo")
-
