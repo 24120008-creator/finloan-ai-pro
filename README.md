@@ -26,8 +26,8 @@ streamlit run app.py
 Tạo `.streamlit/secrets.toml`:
 
 ```toml
-OPENAI_API_KEY = "YOUR_API_KEY"
-OPENAI_MODEL = "gpt-5"
+OPENROUTER_API_KEY = "DAN_OPENROUTER_API_KEY_CUA_BAN"
+OPENROUTER_MODEL = "openai/gpt-4o-mini"
 ```
 
 Không commit file này lên GitHub.
